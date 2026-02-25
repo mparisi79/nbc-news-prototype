@@ -305,17 +305,51 @@ const InsiderTab = () => <div style={{padding:"18px 16px 100px"}}>
 /* ─── Signal tab ─── */
 const SignalTab = ({onPick}) => {
   const {articles}=useContext(DataCtx);
+  const [expanded, setExpanded] = useState(null);
   const featured = articles.filter(a=>a.image).slice(0,3);
   const grouped = {};
   articles.forEach(a=>{if(!grouped[a.category]) grouped[a.category]=[];grouped[a.category].push(a);});
   const sections = Object.entries(grouped).slice(0,4);
+
+  const expArticle = expanded ? articles.find(a=>a.id===expanded) : null;
+  const expStyle = expArticle ? (CAT_STYLE[expArticle.category]||fallbackStyle) : null;
+
+  if(expArticle) return <div style={{height:SCROLL_H,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+    {/* Expanded header */}
+    <div style={{height:240,flexShrink:0,position:"relative",overflow:"hidden"}}>
+      <ImgBg src={expArticle.image}/>
+      <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.85),rgba(0,0,0,.2) 50%,transparent)"}}/>
+      <div style={{position:"absolute",top:12,left:12,zIndex:2}}>
+        <button onClick={()=>setExpanded(null)} style={{background:"rgba(0,0,0,.45)",backdropFilter:"blur(6px)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"50%",color:C.white,fontSize:14,cursor:"pointer",padding:0,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>
+      </div>
+      <div style={{position:"absolute",top:12,left:52,zIndex:2}}>
+        <span style={{background:expStyle.bc,color:C.white,fontSize:8,fontWeight:800,padding:"3px 8px",borderRadius:4,letterSpacing:".06em"}}>{expStyle.badge}</span>
+      </div>
+      <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"16px",zIndex:2}}>
+        <div style={{fontSize:16,fontWeight:700,color:C.white,lineHeight:1.35,letterSpacing:"-.02em",marginBottom:6}}>{expArticle.title}</div>
+        <div style={{fontSize:10,color:"rgba(255,255,255,.45)"}}>{expArticle.author} · {expArticle.pubDate ? new Date(expArticle.pubDate).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}) : ""}</div>
+      </div>
+    </div>
+    {/* Body */}
+    <div className="hide-scroll" style={{flex:1,overflowY:"auto",padding:"16px"}}>
+      <p style={{fontSize:13.5,color:"rgba(255,255,255,.8)",lineHeight:1.7,margin:"0 0 16px"}}>{expArticle.description}</p>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"24px 0"}}>
+        <div style={{width:72,height:72,borderRadius:"50%",background:"rgba(255,255,255,.06)",border:"2px solid rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+          <span style={{color:C.white,fontSize:28,marginLeft:4}}>▶</span>
+        </div>
+      </div>
+      <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,.3)",marginBottom:12}}>Watch full coverage</div>
+      <a href={expArticle.link} target="_blank" rel="noopener noreferrer" style={{display:"block",textAlign:"center",fontSize:11,color:C.blue,textDecoration:"none",marginTop:8}}>Read full article on NBC News →</a>
+    </div>
+  </div>;
+
   return <div style={{paddingBottom:100}}>
     <div style={{padding:"16px 16px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
       <span style={{fontSize:16,fontWeight:700,color:C.white,letterSpacing:"-.02em"}}>For You</span>
       <span style={{fontSize:9,fontWeight:700,color:C.gold,letterSpacing:".04em"}}>★ AD-FREE</span>
     </div>
     <div style={{padding:"12px 16px 0"}}>
-      {featured.map((item,i)=><div key={item.id} onClick={()=>onPick(item.id)} style={{marginBottom:10,borderRadius:14,overflow:"hidden",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
+      {featured.map((item,i)=><div key={item.id} onClick={()=>setExpanded(item.id)} style={{marginBottom:10,borderRadius:14,overflow:"hidden",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
         <div style={{height:100,position:"relative",overflow:"hidden"}}>
           <ImgBg src={item.image}/>
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.75),rgba(0,0,0,.1) 60%,transparent)"}}/>
@@ -332,7 +366,7 @@ const SignalTab = ({onPick}) => {
     {sections.map(([cat,items])=><div key={cat} style={{marginBottom:24}}>
       <div style={{padding:"8px 16px",fontSize:14,fontWeight:700,color:C.white,letterSpacing:"-.02em"}}>{(CAT_STYLE[cat]||fallbackStyle).badge}</div>
       <div className="hide-scroll" style={{display:"flex",gap:10,overflowX:"auto",padding:"0 16px"}}>
-        {items.filter(a=>a.image).slice(0,5).map(item=><div key={item.id} onClick={()=>onPick(item.id)} style={{flexShrink:0,cursor:"pointer"}}>
+        {items.filter(a=>a.image).slice(0,5).map(item=><div key={item.id} onClick={()=>setExpanded(item.id)} style={{flexShrink:0,cursor:"pointer"}}>
           <div style={{width:130,height:84,borderRadius:10,overflow:"hidden",position:"relative",background:"#111"}}>
             <ImgBg src={item.image}/><div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.22)"}}/>
             <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>
