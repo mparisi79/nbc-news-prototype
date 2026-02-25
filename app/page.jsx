@@ -158,7 +158,7 @@ const BriefingTab = ({scrollEl,onSelect}) => {
   return <>
     <div style={{position:"sticky",top:0,zIndex:0,height:HERO_H,overflow:"hidden"}}><BriefingHero/></div>
     <div style={{position:"relative",zIndex:1}}>
-      {timeline.map((item,i)=><div key={item.id} ref={el=>runways.current[i]=el} style={{height:CARD_SECTION,position:"relative",zIndex:i+1}}>
+      {timeline.map((item,i)=><div key={item.id} ref={el=>runways.current[i]=el} style={{height:CARD_SECTION,position:"relative",zIndex:timeline.length-i}}>
         <div style={{position:"sticky",top:0,height:SCROLL_H}}>
           <StoryCard progress={pRef.current[i]||0} item={item}/>
         </div>
