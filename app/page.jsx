@@ -8,7 +8,7 @@ const clamp = (v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 
 const PHONE_W=375, PHONE_H=780, HEADER_H=84, NAV_H=56;
 const SCROLL_H = PHONE_H - HEADER_H - NAV_H;
-const HERO_H=340, RUNWAY=220, CARD_SCROLL=400;
+const HERO_SCROLL=300, RUNWAY=220, CARD_SCROLL=400;
 
 const CAT_STYLE = {
   TOP:{badge:"BREAKING",bc:"#dc2626",bg:"linear-gradient(135deg,#1a1f2e,#0d1117 40%,#1a1520)"},
@@ -171,16 +171,20 @@ const BriefingTab = ({scrollEl, onSelect}) => {
   const {timeline} = useContext(DataCtx);
   const [activeIdx, setActiveIdx] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [heroOp, setHeroOp] = useState(1);
 
-  const totalH = HERO_H + timeline.length * CARD_SCROLL + SCROLL_H;
+  const totalH = HERO_SCROLL + timeline.length * CARD_SCROLL + SCROLL_H;
 
   useEffect(()=>{
     const el=scrollEl.current; if(!el) return;
     const handler=()=>{
       const s=el.scrollTop;
-      const pastHero=Math.max(0, s - HERO_H);
-      const idx=Math.min(Math.floor(pastHero/CARD_SCROLL), timeline.length-1);
-      const p=clamp((pastHero - idx*CARD_SCROLL)/RUNWAY, 0, 1);
+      // Hero fades over first HERO_SCROLL pixels
+      setHeroOp(clamp(1 - s/HERO_SCROLL, 0, 1));
+      // Cards start expanding immediately
+      const cardStart = Math.max(0, s - HERO_SCROLL * 0.3);
+      const idx=Math.min(Math.floor(cardStart/CARD_SCROLL), timeline.length-1);
+      const p=clamp((cardStart - idx*CARD_SCROLL)/RUNWAY, 0, 1);
       setActiveIdx(idx);
       setProgress(p);
       onSelect(p>=.85 ? timeline[idx]?.id : null);
@@ -193,12 +197,12 @@ const BriefingTab = ({scrollEl, onSelect}) => {
   const upcoming = timeline.slice(activeIdx+1).slice(0,3);
 
   return <div style={{height:totalH}}>
-    {/* Hero */}
-    <div style={{position:"sticky",top:0,zIndex:0,height:HERO_H,overflow:"hidden"}}>
-      <BriefingHero/>
-    </div>
-    {/* Card viewport */}
+    {/* Single sticky viewport with hero + cards */}
     <div style={{position:"sticky",top:0,height:SCROLL_H,zIndex:1,overflow:"hidden"}}>
+      {/* Hero behind cards, fades as you scroll */}
+      <div style={{position:"absolute",inset:0,zIndex:0,opacity:heroOp,pointerEvents:heroOp<.1?"none":"auto"}}>
+        <BriefingHero/>
+      </div>
       {/* Active expanding card */}
       {timeline[activeIdx] && <ActiveCard progress={progress} item={timeline[activeIdx]}/>}
       {/* Upcoming compact cards stacked at bottom */}
