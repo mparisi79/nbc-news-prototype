@@ -8,7 +8,7 @@ const clamp = (v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 
 const PHONE_W=375, PHONE_H=780, HEADER_H=84, NAV_H=56;
 const SCROLL_H = PHONE_H - HEADER_H - NAV_H;
-const HERO_H=340, RUNWAY=160, CARD_SECTION=130;
+const HERO_H=340, RUNWAY=220, CARD_SCROLL=400;
 
 const CAT_STYLE = {
   TOP:{badge:"BREAKING",bc:"#dc2626",bg:"linear-gradient(135deg,#1a1f2e,#0d1117 40%,#1a1520)"},
@@ -20,10 +20,9 @@ const CAT_STYLE = {
   SPORTS:{badge:"SPORTS",bc:"#ea580c",bg:"linear-gradient(135deg,#2a1a0a,#0d1117 40%,#1a1008)"},
 };
 const fallbackStyle = CAT_STYLE.TOP;
+const DataCtx = createContext({timeline:[],topics:[],articles:[]});
 
-const DataCtx = createContext({ timeline:[], topics:[], articles:[] });
-
-/* ─── NBC Peacock SVGs ─── */
+/* ─── NBC Peacock ─── */
 const PeacockNav = () => {
   const cx=50,cy=58,r=38;
   const cols=["#e1a91a","#6db335","#009fdb","#6e44a0","#e45a28","#cc2027"];
@@ -70,10 +69,8 @@ const BriefingHero = () => {
     const vig=ctx.createLinearGradient(0,H*.42,0,H);vig.addColorStop(0,"rgba(10,10,10,0)");vig.addColorStop(.3,"rgba(10,10,10,.5)");vig.addColorStop(1,"rgba(10,10,10,.97)");ctx.fillStyle=vig;ctx.fillRect(0,H*.42,W,H*.58);
     const ev=ctx.createRadialGradient(W/2,H*.35,W*.25,W/2,H*.35,W*.8);ev.addColorStop(0,"transparent");ev.addColorStop(1,"rgba(0,0,0,.3)");ctx.fillStyle=ev;ctx.fillRect(0,0,W,H);
   },[]);
-  const now = new Date();
-  const h = now.getHours(), m = now.getMinutes();
-  const ampm = h>=12?"PM":"AM";
-  const time = `${((h+11)%12)+1}:${String(m).padStart(2,"0")}${ampm}`;
+  const now=new Date(), h=now.getHours(), m=now.getMinutes();
+  const time=`${((h+11)%12)+1}:${String(m).padStart(2,"0")}${h>=12?"PM":"AM"}`;
   return <div style={{width:"100%",height:"100%",position:"relative"}}>
     <canvas ref={ref} style={{width:"100%",height:"100%",display:"block"}}/>
     <div style={{position:"absolute",top:0,left:0,right:0,height:"55%",background:"linear-gradient(to bottom,rgba(10,10,10,.85),transparent)",pointerEvents:"none"}}/>
@@ -84,15 +81,52 @@ const BriefingHero = () => {
   </div>;
 };
 
-/* ─── Story card ─── */
-const StoryCard = ({progress:p, item}) => {
-  const s = CAT_STYLE[item.category] || fallbackStyle;
+/* ─── Compact card (in the stack at the bottom) ─── */
+const CompactCard = ({item, offset}) => {
+  const s = CAT_STYLE[item.category]||fallbackStyle;
+  const timeStr = item.pubDate ? new Date(item.pubDate).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}) : "";
+  return <div style={{
+    position:"absolute",
+    bottom: 12 + offset * 8,
+    left: 14 + offset * 3,
+    right: 14 + offset * 3,
+    height: 110,
+    borderRadius: 14,
+    overflow:"hidden",
+    background: s.bg,
+    zIndex: 10 - offset,
+    opacity: 1 - offset * 0.12,
+    transition:"all .35s cubic-bezier(.4,0,.2,1)",
+    boxShadow:"0 -2px 12px rgba(0,0,0,.4)",
+  }}>
+    <ImgBg src={item.image}/>
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)"}}/>
+    <div style={{position:"absolute",top:10,left:12,display:"flex",alignItems:"center",gap:6,zIndex:3}}>
+      <span style={{background:s.bc,color:C.white,fontSize:8,fontWeight:800,padding:"2px 6px",borderRadius:4,letterSpacing:".06em"}}>{s.badge}</span>
+      {timeStr&&<span style={{color:"rgba(255,255,255,.8)",fontSize:9,fontWeight:600,textShadow:"0 1px 4px rgba(0,0,0,.8)"}}>{timeStr}</span>}
+    </div>
+    <div style={{position:"absolute",top:10,right:12,zIndex:3}}>
+      <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,.35)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <span style={{color:"rgba(255,255,255,.7)",fontSize:10,marginLeft:2}}>▶</span>
+      </div>
+    </div>
+    <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"48px 14px 12px",background:"linear-gradient(to top,rgba(0,0,0,.96) 0%,rgba(0,0,0,.6) 55%,transparent)",zIndex:3}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.white,lineHeight:1.35,letterSpacing:"-.01em"}}>{item.title}</div>
+    </div>
+  </div>;
+};
+
+/* ─── Active card (expanding to full bleed) ─── */
+const ActiveCard = ({progress:p, item}) => {
+  const s = CAT_STYLE[item.category]||fallbackStyle;
   const m=lerp(14,0,p), h=lerp(110,SCROLL_H,p), r=lerp(14,0,p);
+  const bottomStart = SCROLL_H - 140;
+  const topPos = lerp(bottomStart, 0, p);
   const compOp=clamp(1-p*3,0,1), fullOp=clamp((p-.15)/.45,0,1);
   const play=lerp(0,72,clamp((p-.25)/.5,0,1));
   const chyOp=clamp((p-.55)/.3,0,1);
   const timeStr = item.pubDate ? new Date(item.pubDate).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}) : "";
-  return <div style={{position:"absolute",top:m,left:m,right:m,height:Math.min(h,SCROLL_H-m*2),borderRadius:r,overflow:"hidden",background:s.bg}}>
+  return <div style={{position:"absolute",top:topPos,left:m,right:m,height:Math.min(h,SCROLL_H-topPos),borderRadius:r,overflow:"hidden",background:s.bg,zIndex:20,boxShadow:"0 -4px 24px rgba(0,0,0,.5)",transition:"none"}}>
     <ImgBg src={item.image}/>
     <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)"}}/>
     {play>4&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:2,opacity:fullOp}}>
@@ -132,40 +166,45 @@ const StoryCard = ({progress:p, item}) => {
   </div>;
 };
 
-/* ─── Briefing tab ─── */
-const BriefingTab = ({scrollEl,onSelect}) => {
+/* ─── Briefing tab (card stack scroll) ─── */
+const BriefingTab = ({scrollEl, onSelect}) => {
   const {timeline} = useContext(DataCtx);
-  const runways=useRef([]);
-  const pRef=useRef(timeline.map(()=>0));
-  const [,tick]=useState(0);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  const totalH = HERO_H + timeline.length * CARD_SCROLL + SCROLL_H;
+
   useEffect(()=>{
-    pRef.current = timeline.map(()=>0);
     const el=scrollEl.current; if(!el) return;
     const handler=()=>{
-      const cTop=el.getBoundingClientRect().top;
-      let active=null;
-      for(let i=0;i<timeline.length;i++){
-        const rw=runways.current[i]; if(!rw){pRef.current[i]=0;continue;}
-        pRef.current[i]=clamp((cTop-rw.getBoundingClientRect().top)/RUNWAY,0,1);
-        if(pRef.current[i]>=.85) active=timeline[i].id;
-      }
-      onSelect(active);
-      tick(n=>n+1);
+      const s=el.scrollTop;
+      const pastHero=Math.max(0, s - HERO_H);
+      const idx=Math.min(Math.floor(pastHero/CARD_SCROLL), timeline.length-1);
+      const p=clamp((pastHero - idx*CARD_SCROLL)/RUNWAY, 0, 1);
+      setActiveIdx(idx);
+      setProgress(p);
+      onSelect(p>=.85 ? timeline[idx]?.id : null);
     };
     el.addEventListener("scroll",handler,{passive:true});
+    handler();
     return()=>el.removeEventListener("scroll",handler);
   },[scrollEl,onSelect,timeline]);
-  return <>
-    <div style={{position:"sticky",top:0,zIndex:0,height:HERO_H,overflow:"hidden"}}><BriefingHero/></div>
-    <div style={{position:"relative",zIndex:1}}>
-      {timeline.map((item,i)=><div key={item.id} ref={el=>runways.current[i]=el} style={{height:CARD_SECTION,position:"relative",zIndex:timeline.length-i}}>
-        <div style={{position:"sticky",top:0,height:SCROLL_H}}>
-          <StoryCard progress={pRef.current[i]||0} item={item}/>
-        </div>
-      </div>)}
-      <div style={{height:1}}/>
+
+  const upcoming = timeline.slice(activeIdx+1).slice(0,3);
+
+  return <div style={{height:totalH}}>
+    {/* Hero */}
+    <div style={{position:"sticky",top:0,zIndex:0,height:HERO_H,overflow:"hidden"}}>
+      <BriefingHero/>
     </div>
-  </>;
+    {/* Card viewport */}
+    <div style={{position:"sticky",top:0,height:SCROLL_H,zIndex:1,overflow:"hidden"}}>
+      {/* Active expanding card */}
+      {timeline[activeIdx] && <ActiveCard progress={progress} item={timeline[activeIdx]}/>}
+      {/* Upcoming compact cards stacked at bottom */}
+      {upcoming.map((item,i) => <CompactCard key={item.id} item={item} offset={i}/>)}
+    </div>
+  </div>;
 };
 
 /* ─── Deeper (AI chat) tab ─── */
@@ -191,7 +230,6 @@ const DeeperTab = ({topicId,onClear}) => {
     setTyping(false);
   };
   const INPUT_H=80, CHAT_H=SCROLL_H-110-INPUT_H;
-  const s = CAT_STYLE[article?.category]||fallbackStyle;
   return <div style={{height:SCROLL_H,display:"flex",flexDirection:"column",overflow:"hidden"}}>
     <div style={{height:110,flexShrink:0,position:"relative",overflow:"hidden"}}>
       <ImgBg src={article?.image}/>
@@ -210,7 +248,7 @@ const DeeperTab = ({topicId,onClear}) => {
         {typing&&<div style={{alignSelf:"flex-start"}}><div style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"16px 16px 16px 4px",padding:"12px 16px",display:"flex",gap:5,alignItems:"center"}}>{[0,1,2].map(i=><div key={i} style={{width:5,height:5,borderRadius:"50%",background:"rgba(255,255,255,.4)",animation:`pulse-dot 1.2s ease-in-out ${i*.18}s infinite`}}/>)}</div></div>}
         <div ref={endRef}/>
       </div>
-      {!typing&&msgs.length===0&&<div style={{marginTop:0,display:"flex",flexDirection:"column",gap:6}}>
+      {!typing&&msgs.length===0&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
         <div style={{fontSize:11,color:C.dimmer,marginBottom:4}}>Suggested questions</div>
         {["What happened?","Why does this matter?","What's next?"].map((sg,i)=><button key={i} onClick={()=>send(sg)} style={{padding:"8px 14px",borderRadius:20,background:"rgba(59,130,246,.07)",border:"1px solid rgba(59,130,246,.18)",color:"#d1d5db",fontSize:12,textAlign:"left",cursor:"pointer"}}>{sg}</button>)}
       </div>}
@@ -265,7 +303,7 @@ const SignalTab = ({onPick}) => {
   const {articles}=useContext(DataCtx);
   const featured = articles.filter(a=>a.image).slice(0,3);
   const grouped = {};
-  articles.forEach(a=>{ if(!grouped[a.category]) grouped[a.category]=[]; grouped[a.category].push(a); });
+  articles.forEach(a=>{if(!grouped[a.category]) grouped[a.category]=[];grouped[a.category].push(a);});
   const sections = Object.entries(grouped).slice(0,4);
   return <div style={{paddingBottom:100}}>
     <div style={{padding:"16px 16px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -327,15 +365,14 @@ export default function App() {
 
   useEffect(()=>{if(scrollRef.current) scrollRef.current.scrollTop=0;},[tab]);
 
-  const changeTab = t => { if(t!=="middle") setActiveTopic(null); setTab(t); };
+  const changeTab = t => {if(t!=="middle") setActiveTopic(null); setTab(t);};
 
   if(loading) return <div style={{height:"100vh",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>
     <span style={{color:"#999",fontSize:11,fontFamily:FONT}}>Loading NBC News…</span>
   </div>;
 
-  const now = new Date();
-  const h = now.getHours(), m = now.getMinutes();
-  const timeStr = `${((h+11)%12)+1}:${String(m).padStart(2,"0")}`;
+  const now=new Date(), h=now.getHours(), m=now.getMinutes();
+  const timeStr=`${((h+11)%12)+1}:${String(m).padStart(2,"0")}`;
 
   return <DataCtx.Provider value={data}>
     <style>{`
@@ -351,12 +388,10 @@ export default function App() {
       .phone-scroll::-webkit-scrollbar-track{background:#0a0a0a}
       .phone-scroll::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
     `}</style>
-
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"30px 20px",fontFamily:FONT}}>
       <div style={{position:"relative"}}>
         <div style={{padding:7,borderRadius:34,background:"linear-gradient(160deg,#2e2e34,#1a1a1e 50%,#26262c)"}}>
           <div style={{width:PHONE_W,height:PHONE_H,background:C.bg,borderRadius:28,overflow:"hidden",position:"relative",fontFamily:FONT}}>
-
             {/* Header */}
             <div style={{position:"absolute",top:0,left:0,right:0,height:HEADER_H,zIndex:20,background:C.bg}}>
               <div style={{height:34,padding:"10px 22px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -372,7 +407,6 @@ export default function App() {
                 <TabBar active={tab} onChange={changeTab} hasHL={hasHL}/>
               </div>
             </div>
-
             {/* Scroll */}
             <div ref={scrollRef} className="phone-scroll" style={{position:"absolute",top:HEADER_H,left:0,right:0,bottom:NAV_H,overflowY:"auto",overflowX:"hidden"}}>
               <div key={tab} className="tab-pane">
@@ -382,7 +416,6 @@ export default function App() {
                 {tab==="Signal"&&<SignalTab onPick={id=>{setActiveTopic(id);setTab("middle");}}/>}
               </div>
             </div>
-
             {/* Bottom nav */}
             <div style={{position:"absolute",bottom:0,left:0,right:0,height:NAV_H,zIndex:20,background:C.bg,borderTop:"1px solid rgba(255,255,255,.1)",display:"flex",alignItems:"center",justifyContent:"space-around",padding:"0 4px"}}>
               {[
@@ -396,7 +429,6 @@ export default function App() {
                 <span style={{fontSize:9,fontWeight:item.active?700:500,color:item.active?C.blue:"rgba(255,255,255,.45)"}}>{item.label}</span>
               </div>)}
             </div>
-
           </div>
         </div>
       </div>
