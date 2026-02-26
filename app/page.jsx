@@ -33,11 +33,18 @@ const PeacockNav = () => {
 };
 
 /* ─── Image background with fallback ─── */
-const ImgBg = ({src,category}) => src
-  ? <div style={{position:"absolute",inset:0,backgroundImage:`url("${src}")`,backgroundSize:"cover",backgroundPosition:"center"}}/>
-  : <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:(CAT_STYLE[category]||fallbackStyle).bg}}>
-      <div style={{opacity:.08,fontSize:120,fontWeight:900,color:"#fff",letterSpacing:"-0.05em",userSelect:"none"}}>NBC</div>
-    </div>;
+const ImgFallback = ({category}) => (
+  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:(CAT_STYLE[category]||fallbackStyle).bg}}>
+    <div style={{opacity:.12,fontSize:100,fontWeight:900,color:"#fff",letterSpacing:"-0.05em",userSelect:"none"}}>NBC</div>
+  </div>
+);
+const ImgBg = ({src,category}) => {
+  const [failed,setFailed] = useState(false);
+  if(!src||failed) return <ImgFallback category={category}/>;
+  return <>
+    <img src={src} onError={()=>setFailed(true)} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+  </>;
+};
 
 /* ─── Tab bar (always Briefing / Insider / Signal) ─── */
 const SLOTS = ["Briefing","middle","Signal"];
