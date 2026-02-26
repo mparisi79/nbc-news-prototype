@@ -42,7 +42,8 @@ const ImgBg = ({src,category}) => {
   const [failed,setFailed] = useState(false);
   if(!src||failed) return <ImgFallback category={category}/>;
   return <>
-    <img src={src} onError={()=>setFailed(true)} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+    <img src={src} referrerPolicy="no-referrer" onError={()=>setFailed(true)} style={{position:"absolute",width:1,height:1,opacity:0,pointerEvents:"none"}}/>
+    <div style={{position:"absolute",inset:0,backgroundImage:`url("${src}")`,backgroundSize:"cover",backgroundPosition:"center"}}/>
   </>;
 };
 
