@@ -32,10 +32,12 @@ const PeacockNav = () => {
   })}<ellipse cx={cx} cy={cy-2} rx="5" ry="7" fill="#fff"/></svg>;
 };
 
-/* ─── Image background ─── */
-const ImgBg = ({src}) => src
+/* ─── Image background with fallback ─── */
+const ImgBg = ({src,category}) => src
   ? <div style={{position:"absolute",inset:0,backgroundImage:`url("${src}")`,backgroundSize:"cover",backgroundPosition:"center"}}/>
-  : null;
+  : <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:(CAT_STYLE[category]||fallbackStyle).bg}}>
+      <div style={{opacity:.08,fontSize:120,fontWeight:900,color:"#fff",letterSpacing:"-0.05em",userSelect:"none"}}>NBC</div>
+    </div>;
 
 /* ─── Tab bar (always Briefing / Insider / Signal) ─── */
 const SLOTS = ["Briefing","middle","Signal"];
@@ -99,7 +101,7 @@ const CompactCard = ({item, offset}) => {
     transition:"all .35s cubic-bezier(.4,0,.2,1)",
     boxShadow:"0 -2px 12px rgba(0,0,0,.4)",
   }}>
-    <ImgBg src={item.image}/>
+    <ImgBg src={item.image} category={item.category}/>
     <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)"}}/>
     <div style={{position:"absolute",top:10,left:12,display:"flex",alignItems:"center",gap:6,zIndex:3}}>
       <span style={{background:s.bc,color:C.white,fontSize:8,fontWeight:800,padding:"2px 6px",borderRadius:4,letterSpacing:".06em"}}>{s.badge}</span>
@@ -147,7 +149,7 @@ const ActiveCard = ({progress:p, item, onDeeper}) => {
   const pillOp=clamp((p-.75)/.2,0,1);
   const timeStr = item.pubDate ? new Date(item.pubDate).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}) : "";
   return <div style={{position:"absolute",top:topPos,left:m,right:m,height:Math.min(h,SCROLL_H-topPos),borderRadius:r,overflow:"hidden",background:s.bg,zIndex:20,boxShadow:"0 -4px 24px rgba(0,0,0,.5)",transition:"none"}}>
-    <ImgBg src={item.image}/>
+    <ImgBg src={item.image} category={item.category}/>
     <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)"}}/>
     {play>4&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:2,opacity:fullOp}}>
       <div style={{width:play,height:play,borderRadius:"50%",background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(255,255,255,.2)"}}>
@@ -230,7 +232,7 @@ const BriefingTab = ({scrollEl, onDeeper}) => {
 };
 
 /* ─── Bottom Sheet (Deeper chat) ─── */
-const SHEET_MAX = SCROLL_H + HEADER_H + NAV_H - 40; /* nearly full phone minus a peek */
+const SHEET_MAX = SCROLL_H + HEADER_H + NAV_H - 40;
 const DeeperSheet = ({articleId, onClose}) => {
   const {articles} = useContext(DataCtx);
   const article = articles.find(a=>a.id===articleId);
@@ -241,7 +243,6 @@ const DeeperSheet = ({articleId, onClose}) => {
   const [focused, setFocused] = useState(false);
   const endRef = useRef(null);
 
-  // Animate in on mount
   useEffect(()=>{requestAnimationFrame(()=>requestAnimationFrame(()=>setOpen(true)));},[]);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[msgs,typing]);
 
@@ -291,7 +292,7 @@ const DeeperSheet = ({articleId, onClose}) => {
       {/* Story context header */}
       <div style={{height:HEADER,flexShrink:0,padding:"0 16px 12px",display:"flex",gap:12,alignItems:"center",borderBottom:"1px solid rgba(255,255,255,.07)"}}>
         {article?.image && <div style={{width:56,height:56,borderRadius:10,overflow:"hidden",flexShrink:0,position:"relative",background:"#111"}}>
-          <ImgBg src={article.image}/>
+          <ImgBg src={article.image} category={article.category}/>
         </div>}
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
@@ -377,7 +378,7 @@ const SignalTab = ({onDeeper}) => {
 
   if(expArticle) return <div style={{height:SCROLL_H,display:"flex",flexDirection:"column",overflow:"hidden"}}>
     <div style={{height:240,flexShrink:0,position:"relative",overflow:"hidden"}}>
-      <ImgBg src={expArticle.image}/>
+      <ImgBg src={expArticle.image} category={expArticle.category}/>
       <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.85),rgba(0,0,0,.2) 50%,transparent)"}}/>
       <div style={{position:"absolute",top:12,left:12,zIndex:2}}>
         <button onClick={()=>setExpanded(null)} style={{background:"rgba(0,0,0,.45)",backdropFilter:"blur(6px)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"50%",color:C.white,fontSize:14,cursor:"pointer",padding:0,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>
@@ -414,7 +415,7 @@ const SignalTab = ({onDeeper}) => {
     <div style={{padding:"12px 16px 0"}}>
       {featured.map((item,i)=><div key={item.id} onClick={()=>setExpanded(item.id)} style={{marginBottom:10,borderRadius:14,overflow:"hidden",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
         <div style={{height:100,position:"relative",overflow:"hidden"}}>
-          <ImgBg src={item.image}/>
+          <ImgBg src={item.image} category={item.category}/>
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.75),rgba(0,0,0,.1) 60%,transparent)"}}/>
           <div style={{position:"absolute",bottom:9,left:10,zIndex:1}}>
             <span style={{background:"rgba(255,255,255,.12)",backdropFilter:"blur(6px)",color:C.white,fontSize:7.5,fontWeight:800,padding:"3px 8px",borderRadius:4,letterSpacing:".07em",border:"1px solid rgba(255,255,255,.15)"}}>{(CAT_STYLE[item.category]||fallbackStyle).badge}</span>
@@ -431,7 +432,7 @@ const SignalTab = ({onDeeper}) => {
       <div className="hide-scroll" style={{display:"flex",gap:10,overflowX:"auto",padding:"0 16px"}}>
         {items.filter(a=>a.image).slice(0,5).map(item=><div key={item.id} onClick={()=>setExpanded(item.id)} style={{flexShrink:0,cursor:"pointer"}}>
           <div style={{width:130,height:84,borderRadius:10,overflow:"hidden",position:"relative",background:"#111"}}>
-            <ImgBg src={item.image}/><div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.22)"}}/>
+            <ImgBg src={item.image} category={item.category}/><div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.22)"}}/>
             <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>
               <div style={{width:26,height:26,borderRadius:"50%",background:"rgba(0,0,0,.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid rgba(255,255,255,.15)"}}>
                 <span style={{color:"rgba(255,255,255,.8)",fontSize:9,marginLeft:1}}>▶</span>
@@ -524,16 +525,4 @@ export default function App() {
                 {label:"Home",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>},
                 {label:"Live",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>},
                 {label:"Subscribers",active:true,icon:<PeacockNav/>},
-                {label:"Shorts",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><polygon points="10 10 10 18 16 14" fill="rgba(255,255,255,.45)" stroke="none"/></svg>},
-                {label:"Discover",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},
-              ].map((item,i)=><div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",minWidth:48}}>
-                {item.icon}
-                <span style={{fontSize:9,fontWeight:item.active?700:500,color:item.active?C.blue:"rgba(255,255,255,.45)"}}>{item.label}</span>
-              </div>)}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </DataCtx.Provider>;
-}
+                {label:"Shorts",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><polygo
