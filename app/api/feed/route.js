@@ -116,7 +116,11 @@ function parseItems(xml, category) {
       link: item.link || "",
       pubDate: item.pubDate || "",
       image: extractImage(item),
-      author: item["dc:creator"] || item.author || "NBC News",
+      author: (() => {
+        const raw = item["dc:creator"] || item.author || "NBC News";
+        if (Array.isArray(raw)) return raw.join(", ");
+        return raw;
+      })(),
     }));
   } catch { return []; }
 }
