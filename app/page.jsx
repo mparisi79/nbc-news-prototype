@@ -190,9 +190,13 @@ const ActiveCard = ({progress:p, item, onDeeper}) => {
         <span style={{color:"rgba(255,255,255,.35)",fontSize:8.5}}>{item.author} · LIVE</span>
       </div>
     </div>
-    {/* "Go deeper" pill — fades in when card is nearly full */}
-    {pillOp>0 && <div style={{position:"absolute",bottom:52,left:0,right:0,zIndex:5,display:"flex",justifyContent:"center",opacity:pillOp,transform:`translateY(${lerp(10,0,pillOp)}px)`,transition:"none"}}>
-      <DeeperPill onClick={()=>onDeeper(item.id)}/>
+    {/* "Go deeper" full-width bar — fades in above chyron */}
+    {pillOp>0 && <div onClick={()=>onDeeper(item.id)} style={{position:"absolute",bottom:52,left:0,right:0,zIndex:5,opacity:pillOp,transform:`translateY(${lerp(8,0,pillOp)}px)`,transition:"none",cursor:"pointer",background:"rgba(59,130,246,.95)",padding:"9px 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+      </svg>
+      <span style={{fontSize:12,fontWeight:700,color:"#fff",letterSpacing:".02em"}}>GO DEEPER</span>
+      <span style={{fontSize:12,color:"rgba(255,255,255,.6)"}}>→</span>
     </div>}
   </div>;
 };
