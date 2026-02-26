@@ -1,5 +1,4 @@
 import { XMLParser } from "fast-xml-parser";
-
 const FEEDS = [
   { url: "https://feeds.nbcnews.com/nbcnews/public/news", category: "TOP" },
   { url: "https://feeds.nbcnews.com/nbcnews/public/politics", category: "POLITICS" },
@@ -9,44 +8,97 @@ const FEEDS = [
   { url: "https://feeds.nbcnews.com/nbcnews/public/tech", category: "TECH" },
   { url: "https://feeds.nbcnews.com/nbcnews/public/sports", category: "SPORTS" },
 ];
-
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
 });
 
+function getUrl(obj) {
+  if (!obj) return null;
+  if (typeof obj === "string" && obj.startsWith("http")) return obj;
+  if (obj["@_url"]) return obj["@_url"];
+  if (obj["@_href"]) return obj["@_href"];
+  return null;
+}
+
 function extractImage(item) {
-  // Try media:content
+  // 1. Direct image field
+  if (item.image) {
+    if (typeof item.image === "string" && item.image.startsWith("http")) return item.image;
+    if (item.image?.url) return item.image.url;
+  }
+
+  // 2. media:content (single or array)
   const mc = item["media:content"];
   if (mc) {
     if (Array.isArray(mc)) {
       const img = mc.find(m => m["@_medium"] === "image" || m["@_type"]?.startsWith("image"));
       if (img?.["@_url"]) return img["@_url"];
-      if (mc[0]?.["@_url"]) return mc[0]["@_url"];
-    } else if (mc["@_url"]) return mc["@_url"];
+      // Fall back to first item with a URL
+      for (const m of mc) { const u = getUrl(m); if (u) return u; }
+    } else {
+      const u = getUrl(mc);
+      if (u) return u;
+    }
   }
-  // Try media:thumbnail
+
+  // 3. media:thumbnail (single or array)
   const mt = item["media:thumbnail"];
   if (mt) {
-    if (Array.isArray(mt)) return mt[0]?.["@_url"] || null;
-    return mt["@_url"] || null;
+    if (Array.isArray(mt)) {
+      for (const t of mt) { const u = getUrl(t); if (u) return u; }
+    } else {
+      const u = getUrl(mt);
+      if (u) return u;
+    }
   }
-  // Try media:group
+
+  // 4. media:group — check both media:content AND media:thumbnail inside
   const mg = item["media:group"];
   if (mg) {
     const mgc = mg["media:content"];
-    if (Array.isArray(mgc)) {
-      const img = mgc.find(m => m["@_medium"] === "image");
-      if (img?.["@_url"]) return img["@_url"];
-    } else if (mgc?.["@_url"]) return mgc["@_url"];
+    if (mgc) {
+      if (Array.isArray(mgc)) {
+        const img = mgc.find(m => m["@_medium"] === "image");
+        if (img?.["@_url"]) return img["@_url"];
+        for (const m of mgc) { const u = getUrl(m); if (u) return u; }
+      } else {
+        const u = getUrl(mgc);
+        if (u) return u;
+      }
+    }
+    const mgt = mg["media:thumbnail"];
+    if (mgt) {
+      const u = getUrl(Array.isArray(mgt) ? mgt[0] : mgt);
+      if (u) return u;
+    }
   }
-  // Try enclosure
+
+  // 5. enclosure
   const enc = item.enclosure;
-  if (enc?.["@_type"]?.startsWith("image")) return enc["@_url"] || null;
-  // Try og:image or img in description
-  const desc = item.description || item["content:encoded"] || "";
-  const imgMatch = desc.match(/<img[^>]+src=["']([^"']+)/);
-  if (imgMatch) return imgMatch[1];
+  if (enc) {
+    if (Array.isArray(enc)) {
+      const img = enc.find(e => e["@_type"]?.startsWith("image"));
+      if (img?.["@_url"]) return img["@_url"];
+    } else if (enc["@_type"]?.startsWith("image") || enc["@_url"]?.match(/\.(jpg|jpeg|png|webp)/i)) {
+      return enc["@_url"] || null;
+    }
+  }
+
+  // 6. Search description and content:encoded for <img> tags
+  //    Decode HTML entities first so &lt;img&gt; patterns are caught
+  const raw = [item.description, item["content:encoded"]].filter(Boolean).join(" ");
+  const decoded = raw
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&amp;/g, "&")
+    .replace(/&#39;/g, "'");
+  const imgMatch = decoded.match(/<img[^>]+src=["']([^"']+)/);
+  if (imgMatch?.[1]) return imgMatch[1];
+
+  // 7. Look for any bare image URL in the raw content
+  const urlMatch = decoded.match(/(https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)[^\s"'<>]*)/i);
+  if (urlMatch?.[1]) return urlMatch[1];
+
   return null;
 }
 
@@ -74,7 +126,7 @@ export async function GET() {
     const results = await Promise.allSettled(
       FEEDS.map(async ({ url, category }) => {
         const res = await fetch(url, {
-          next: { revalidate: 300 }, // cache 5 min
+          next: { revalidate: 300 },
           headers: { "User-Agent": "NBC-News-Prototype/1.0" },
         });
         if (!res.ok) return [];
@@ -86,7 +138,6 @@ export async function GET() {
       .filter(r => r.status === "fulfilled")
       .flatMap(r => r.value)
       .filter(a => a.title);
-
     return Response.json({ articles, fetchedAt: new Date().toISOString() });
   } catch (e) {
     return Response.json({ articles: [], error: e.message }, { status: 500 });
