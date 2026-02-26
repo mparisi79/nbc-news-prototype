@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, createContext, useContext } from "react";
+import { useState, useRef, useEffect, createContext, useContext, useCallback } from "react";
 
 const C = {bg:"#0a0a0a",white:"#fff",dim:"#9ca3af",dimmer:"#6b7280",blue:"#3b82f6",red:"#ef4444",gold:"#d4a853"};
 const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
@@ -37,10 +37,10 @@ const ImgBg = ({src}) => src
   ? <div style={{position:"absolute",inset:0,backgroundImage:`url("${src}")`,backgroundSize:"cover",backgroundPosition:"center"}}/>
   : null;
 
-/* ─── Tab bar ─── */
+/* ─── Tab bar (always Briefing / Insider / Signal) ─── */
 const SLOTS = ["Briefing","middle","Signal"];
-const TabBar = ({active,onChange,hasHL}) => {
-  const labels=["Briefing",hasHL?"Deeper":"Insider","Signal"];
+const TabBar = ({active,onChange}) => {
+  const labels=["Briefing","Insider","Signal"];
   const idx=SLOTS.indexOf(active);
   return <div style={{display:"flex",background:"rgba(255,255,255,.07)",borderRadius:22,padding:3,position:"relative"}}>
     <div style={{position:"absolute",top:3,bottom:3,borderRadius:18,background:"rgba(255,255,255,.13)",width:`calc((100% - 6px)/3)`,left:`calc(3px + ${idx}*(100% - 6px)/3)`,transition:"left .25s cubic-bezier(.4,0,.2,1)",pointerEvents:"none"}}/>
@@ -116,8 +116,27 @@ const CompactCard = ({item, offset}) => {
   </div>;
 };
 
+/* ─── "Go deeper" pill ─── */
+const DeeperPill = ({onClick}) => (
+  <button onClick={onClick} style={{
+    display:"flex",alignItems:"center",gap:6,
+    padding:"8px 18px",borderRadius:20,
+    background:"rgba(59,130,246,.12)",
+    border:"1px solid rgba(59,130,246,.25)",
+    backdropFilter:"blur(8px)",
+    cursor:"pointer",
+    animation:"pill-glow 2.5s ease-in-out infinite",
+  }}>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+    </svg>
+    <span style={{fontSize:11.5,fontWeight:600,color:C.blue,letterSpacing:"-.01em"}}>Go deeper</span>
+    <span style={{fontSize:11,color:"rgba(59,130,246,.6)"}}>↑</span>
+  </button>
+);
+
 /* ─── Active card (expanding to full bleed) ─── */
-const ActiveCard = ({progress:p, item}) => {
+const ActiveCard = ({progress:p, item, onDeeper}) => {
   const s = CAT_STYLE[item.category]||fallbackStyle;
   const m=lerp(14,0,p), h=lerp(110,SCROLL_H,p), r=lerp(14,0,p);
   const bottomStart = SCROLL_H - 140;
@@ -125,6 +144,7 @@ const ActiveCard = ({progress:p, item}) => {
   const compOp=clamp(1-p*3,0,1), fullOp=clamp((p-.15)/.45,0,1);
   const play=lerp(0,72,clamp((p-.25)/.5,0,1));
   const chyOp=clamp((p-.55)/.3,0,1);
+  const pillOp=clamp((p-.75)/.2,0,1);
   const timeStr = item.pubDate ? new Date(item.pubDate).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}) : "";
   return <div style={{position:"absolute",top:topPos,left:m,right:m,height:Math.min(h,SCROLL_H-topPos),borderRadius:r,overflow:"hidden",background:s.bg,zIndex:20,boxShadow:"0 -4px 24px rgba(0,0,0,.5)",transition:"none"}}>
     <ImgBg src={item.image}/>
@@ -149,6 +169,7 @@ const ActiveCard = ({progress:p, item}) => {
         <span style={{color:"rgba(255,255,255,.7)",fontSize:10,marginLeft:2}}>▶</span>
       </div>
     </div>
+    {/* Chyron bar */}
     <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:4,opacity:chyOp}}>
       <div style={{display:"flex",alignItems:"stretch"}}>
         <div style={{background:s.bc,padding:"7px 12px",display:"flex",alignItems:"center",flexShrink:0}}>
@@ -163,11 +184,15 @@ const ActiveCard = ({progress:p, item}) => {
         <span style={{color:"rgba(255,255,255,.35)",fontSize:8.5}}>{item.author} · LIVE</span>
       </div>
     </div>
+    {/* "Go deeper" pill — fades in when card is nearly full */}
+    {pillOp>0 && <div style={{position:"absolute",bottom:52,left:0,right:0,zIndex:5,display:"flex",justifyContent:"center",opacity:pillOp,transform:`translateY(${lerp(10,0,pillOp)}px)`,transition:"none"}}>
+      <DeeperPill onClick={()=>onDeeper(item.id)}/>
+    </div>}
   </div>;
 };
 
 /* ─── Briefing tab (card stack scroll) ─── */
-const BriefingTab = ({scrollEl, onSelect}) => {
+const BriefingTab = ({scrollEl, onDeeper}) => {
   const {timeline} = useContext(DataCtx);
   const [activeIdx, setActiveIdx] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -179,49 +204,51 @@ const BriefingTab = ({scrollEl, onSelect}) => {
     const el=scrollEl.current; if(!el) return;
     const handler=()=>{
       const s=el.scrollTop;
-      // Hero fades over first HERO_SCROLL pixels
       setHeroOp(clamp(1 - s/HERO_SCROLL, 0, 1));
-      // Cards start expanding immediately
       const cardStart = Math.max(0, s - HERO_SCROLL * 0.3);
       const idx=Math.min(Math.floor(cardStart/CARD_SCROLL), timeline.length-1);
       const p=clamp((cardStart - idx*CARD_SCROLL)/RUNWAY, 0, 1);
       setActiveIdx(idx);
       setProgress(p);
-      onSelect(p>=.85 ? timeline[idx]?.id : null);
     };
     el.addEventListener("scroll",handler,{passive:true});
     handler();
     return()=>el.removeEventListener("scroll",handler);
-  },[scrollEl,onSelect,timeline]);
+  },[scrollEl,timeline]);
 
   const upcoming = timeline.slice(activeIdx+1).slice(0,3);
 
   return <div style={{height:totalH}}>
-    {/* Single sticky viewport with hero + cards */}
     <div style={{position:"sticky",top:0,height:SCROLL_H,zIndex:1,overflow:"hidden"}}>
-      {/* Hero behind cards, fades as you scroll */}
       <div style={{position:"absolute",inset:0,zIndex:0,opacity:heroOp,pointerEvents:heroOp<.1?"none":"auto"}}>
         <BriefingHero/>
       </div>
-      {/* Active expanding card */}
-      {timeline[activeIdx] && <ActiveCard progress={progress} item={timeline[activeIdx]}/>}
-      {/* Upcoming compact cards stacked at bottom */}
+      {timeline[activeIdx] && <ActiveCard progress={progress} item={timeline[activeIdx]} onDeeper={onDeeper}/>}
       {upcoming.map((item,i) => <CompactCard key={item.id} item={item} offset={i}/>)}
     </div>
   </div>;
 };
 
-/* ─── Deeper (AI chat) tab ─── */
-const DeeperTab = ({topicId,onClear}) => {
-  const {articles}=useContext(DataCtx);
-  const article = articles.find(a=>a.id===topicId);
-  const [msgs,setMsgs]=useState([]);
-  const [q,setQ]=useState("");
-  const [typing,setTyping]=useState(false);
-  const [focused,setFocused]=useState(false);
-  const endRef=useRef(null);
+/* ─── Bottom Sheet (Deeper chat) ─── */
+const SHEET_MAX = SCROLL_H + HEADER_H + NAV_H - 40; /* nearly full phone minus a peek */
+const DeeperSheet = ({articleId, onClose}) => {
+  const {articles} = useContext(DataCtx);
+  const article = articles.find(a=>a.id===articleId);
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState([]);
+  const [q, setQ] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const endRef = useRef(null);
+
+  // Animate in on mount
+  useEffect(()=>{requestAnimationFrame(()=>requestAnimationFrame(()=>setOpen(true)));},[]);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[msgs,typing]);
+
+  const close = () => { setOpen(false); setTimeout(onClose, 320); };
+
   const sysPrompt = `You are an NBC News AI assistant. The user is asking about this story: "${article?.title}". Description: ${article?.description}. Category: ${article?.category}. Answer concisely in 2-3 sentences based on what you know about this topic.`;
+
   const send = async (text) => {
     if(!text.trim()||typing) return;
     const next=[...msgs,{role:"user",text:text.trim()}];
@@ -233,39 +260,73 @@ const DeeperTab = ({topicId,onClear}) => {
     } catch { setMsgs(m=>[...m,{role:"ai",text:"Having trouble connecting."}]); }
     setTyping(false);
   };
-  const INPUT_H=80, CHAT_H=SCROLL_H-110-INPUT_H;
-  return <div style={{height:SCROLL_H,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-    <div style={{height:110,flexShrink:0,position:"relative",overflow:"hidden"}}>
-      <ImgBg src={article?.image}/>
-      <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.15),rgba(10,10,10,.97))"}}/>
-      <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"10px 16px 12px",display:"flex",alignItems:"center",gap:10}}>
-        <button onClick={onClear} style={{background:"rgba(255,255,255,.09)",border:"1px solid rgba(255,255,255,.13)",borderRadius:"50%",color:C.white,fontSize:14,cursor:"pointer",padding:0,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
-        <div style={{flex:1,fontSize:12,fontWeight:600,color:C.white,lineHeight:1.35}}>{article?.title}</div>
-        <span style={{fontSize:8,fontWeight:800,color:C.blue,letterSpacing:".08em"}}>LIVE</span>
+
+  const s = article ? (CAT_STYLE[article.category]||fallbackStyle) : fallbackStyle;
+  const HEADER=88, INPUT_H=76;
+
+  return <>
+    {/* Backdrop */}
+    <div onClick={close} style={{
+      position:"absolute",inset:0,zIndex:30,
+      background:"rgba(0,0,0,.55)",
+      opacity:open?1:0,
+      transition:"opacity .3s ease",
+    }}/>
+    {/* Sheet */}
+    <div style={{
+      position:"absolute",bottom:0,left:0,right:0,zIndex:31,
+      height:SHEET_MAX,
+      background:C.bg,
+      borderRadius:"18px 18px 0 0",
+      transform:open?"translateY(0)":`translateY(${SHEET_MAX}px)`,
+      transition:"transform .32s cubic-bezier(.4,0,.2,1)",
+      display:"flex",flexDirection:"column",
+      overflow:"hidden",
+      boxShadow:"0 -8px 40px rgba(0,0,0,.6)",
+    }}>
+      {/* Drag handle */}
+      <div style={{display:"flex",justifyContent:"center",padding:"10px 0 6px",flexShrink:0}}>
+        <div style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,.2)"}}/>
+      </div>
+      {/* Story context header */}
+      <div style={{height:HEADER,flexShrink:0,padding:"0 16px 12px",display:"flex",gap:12,alignItems:"center",borderBottom:"1px solid rgba(255,255,255,.07)"}}>
+        {article?.image && <div style={{width:56,height:56,borderRadius:10,overflow:"hidden",flexShrink:0,position:"relative",background:"#111"}}>
+          <ImgBg src={article.image}/>
+        </div>}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+            <span style={{background:s.bc,color:C.white,fontSize:7.5,fontWeight:800,padding:"2px 6px",borderRadius:3,letterSpacing:".06em"}}>{s.badge}</span>
+            <span style={{fontSize:8,color:"rgba(255,255,255,.3)",fontWeight:700,letterSpacing:".04em"}}>AI ANALYSIS</span>
+          </div>
+          <div style={{fontSize:12,fontWeight:600,color:C.white,lineHeight:1.35,overflow:"hidden",textOverflow:"ellipsis",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{article?.title}</div>
+        </div>
+        <button onClick={close} style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"50%",color:C.white,fontSize:13,cursor:"pointer",padding:0,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+      </div>
+      {/* Chat area */}
+      <div className="hide-scroll" style={{flex:1,overflowY:"auto",padding:"14px 16px"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {msgs.map((m,i)=><div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%"}}>
+            <div style={{background:m.role==="user"?C.blue:"rgba(255,255,255,.07)",border:m.role==="ai"?"1px solid rgba(255,255,255,.1)":"none",color:C.white,borderRadius:m.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",fontSize:13.5,lineHeight:1.6}}>{m.text}</div>
+          </div>)}
+          {typing&&<div style={{alignSelf:"flex-start"}}><div style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"16px 16px 16px 4px",padding:"12px 16px",display:"flex",gap:5,alignItems:"center"}}>{[0,1,2].map(i=><div key={i} style={{width:5,height:5,borderRadius:"50%",background:"rgba(255,255,255,.4)",animation:`pulse-dot 1.2s ease-in-out ${i*.18}s infinite`}}/>)}</div></div>}
+          <div ref={endRef}/>
+        </div>
+        {!typing&&msgs.length===0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
+          <div style={{fontSize:11,color:C.dimmer,marginBottom:4}}>Suggested questions</div>
+          {["What happened?","Why does this matter?","What's next?"].map((sg,i)=><button key={i} onClick={()=>send(sg)} style={{padding:"8px 14px",borderRadius:20,background:"rgba(59,130,246,.07)",border:"1px solid rgba(59,130,246,.18)",color:"#d1d5db",fontSize:12,textAlign:"left",cursor:"pointer"}}>{sg}</button>)}
+        </div>}
+      </div>
+      {/* Input */}
+      <div style={{height:INPUT_H,flexShrink:0,padding:"8px 16px 14px",borderTop:"1px solid rgba(255,255,255,.07)",display:"flex",flexDirection:"column",justifyContent:"center",gap:5}}>
+        <div style={{fontSize:8,color:"rgba(255,255,255,.18)",textAlign:"center",letterSpacing:".04em"}}>POWERED BY AI · NBC SOURCES ONLY</div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send(q)} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)} placeholder="Ask about this story"
+            style={{flex:1,padding:"10px 16px",borderRadius:22,border:focused?"1.5px solid rgba(59,130,246,.5)":"1.5px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",fontSize:13,color:C.white,outline:"none",transition:"border-color .2s"}}/>
+          <button onClick={()=>send(q)} style={{width:36,height:36,borderRadius:"50%",background:q.trim()?C.blue:"rgba(255,255,255,.07)",border:"none",color:C.white,cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background .2s"}}>→</button>
+        </div>
       </div>
     </div>
-    <div className="hide-scroll" style={{height:CHAT_H,overflowY:"auto",padding:"14px 16px",flexShrink:0}}>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {msgs.map((m,i)=><div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%"}}>
-          <div style={{background:m.role==="user"?C.blue:"rgba(255,255,255,.07)",border:m.role==="ai"?"1px solid rgba(255,255,255,.1)":"none",color:C.white,borderRadius:m.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",fontSize:13.5,lineHeight:1.6}}>{m.text}</div>
-        </div>)}
-        {typing&&<div style={{alignSelf:"flex-start"}}><div style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:"16px 16px 16px 4px",padding:"12px 16px",display:"flex",gap:5,alignItems:"center"}}>{[0,1,2].map(i=><div key={i} style={{width:5,height:5,borderRadius:"50%",background:"rgba(255,255,255,.4)",animation:`pulse-dot 1.2s ease-in-out ${i*.18}s infinite`}}/>)}</div></div>}
-        <div ref={endRef}/>
-      </div>
-      {!typing&&msgs.length===0&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
-        <div style={{fontSize:11,color:C.dimmer,marginBottom:4}}>Suggested questions</div>
-        {["What happened?","Why does this matter?","What's next?"].map((sg,i)=><button key={i} onClick={()=>send(sg)} style={{padding:"8px 14px",borderRadius:20,background:"rgba(59,130,246,.07)",border:"1px solid rgba(59,130,246,.18)",color:"#d1d5db",fontSize:12,textAlign:"left",cursor:"pointer"}}>{sg}</button>)}
-      </div>}
-    </div>
-    <div style={{height:INPUT_H,flexShrink:0,padding:"8px 16px 12px",borderTop:"1px solid rgba(255,255,255,.07)",display:"flex",flexDirection:"column",justifyContent:"center",gap:6}}>
-      <div style={{fontSize:8.5,color:"rgba(255,255,255,.2)",textAlign:"center",letterSpacing:".04em"}}>POWERED BY AI · NBC SOURCES ONLY</div>
-      <div style={{display:"flex",gap:8,alignItems:"center"}}>
-        <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send(q)} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)} placeholder="Ask the Newsroom"
-          style={{flex:1,padding:"10px 16px",borderRadius:22,border:focused?"1.5px solid rgba(59,130,246,.5)":"1.5px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",fontSize:13,color:C.white,outline:"none",transition:"border-color .2s"}}/>
-        <button onClick={()=>send(q)} style={{width:36,height:36,borderRadius:"50%",background:q.trim()?C.blue:"rgba(255,255,255,.07)",border:"none",color:C.white,cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background .2s"}}>→</button>
-      </div>
-    </div>
-  </div>;
+  </>;
 };
 
 /* ─── Insider tab ─── */
@@ -303,7 +364,7 @@ const InsiderTab = () => <div style={{padding:"18px 16px 100px"}}>
 </div>;
 
 /* ─── Signal tab ─── */
-const SignalTab = ({onPick}) => {
+const SignalTab = ({onDeeper}) => {
   const {articles}=useContext(DataCtx);
   const [expanded, setExpanded] = useState(null);
   const featured = articles.filter(a=>a.image).slice(0,3);
@@ -315,7 +376,6 @@ const SignalTab = ({onPick}) => {
   const expStyle = expArticle ? (CAT_STYLE[expArticle.category]||fallbackStyle) : null;
 
   if(expArticle) return <div style={{height:SCROLL_H,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-    {/* Expanded header */}
     <div style={{height:240,flexShrink:0,position:"relative",overflow:"hidden"}}>
       <ImgBg src={expArticle.image}/>
       <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.85),rgba(0,0,0,.2) 50%,transparent)"}}/>
@@ -330,10 +390,13 @@ const SignalTab = ({onPick}) => {
         <div style={{fontSize:10,color:"rgba(255,255,255,.45)"}}>{expArticle.author} · {expArticle.pubDate ? new Date(expArticle.pubDate).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}) : ""}</div>
       </div>
     </div>
-    {/* Body */}
     <div className="hide-scroll" style={{flex:1,overflowY:"auto",padding:"16px"}}>
       <p style={{fontSize:13.5,color:"rgba(255,255,255,.8)",lineHeight:1.7,margin:"0 0 16px"}}>{expArticle.description}</p>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"24px 0"}}>
+      {/* Go deeper pill */}
+      <div style={{display:"flex",justifyContent:"center",padding:"8px 0 20px"}}>
+        <DeeperPill onClick={()=>onDeeper(expArticle.id)}/>
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"8px 0 24px"}}>
         <div style={{width:72,height:72,borderRadius:"50%",background:"rgba(255,255,255,.06)",border:"2px solid rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
           <span style={{color:C.white,fontSize:28,marginLeft:4}}>▶</span>
         </div>
@@ -349,7 +412,7 @@ const SignalTab = ({onPick}) => {
       <span style={{fontSize:9,fontWeight:700,color:C.gold,letterSpacing:".04em"}}>★ AD-FREE</span>
     </div>
     <div style={{padding:"12px 16px 0"}}>
-      {featured.map((item,i)=><div key={item.id} onClick={()=>{setExpanded(item.id);onPick(item.id);}} style={{marginBottom:10,borderRadius:14,overflow:"hidden",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
+      {featured.map((item,i)=><div key={item.id} onClick={()=>setExpanded(item.id)} style={{marginBottom:10,borderRadius:14,overflow:"hidden",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
         <div style={{height:100,position:"relative",overflow:"hidden"}}>
           <ImgBg src={item.image}/>
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.75),rgba(0,0,0,.1) 60%,transparent)"}}/>
@@ -366,7 +429,7 @@ const SignalTab = ({onPick}) => {
     {sections.map(([cat,items])=><div key={cat} style={{marginBottom:24}}>
       <div style={{padding:"8px 16px",fontSize:14,fontWeight:700,color:C.white,letterSpacing:"-.02em"}}>{(CAT_STYLE[cat]||fallbackStyle).badge}</div>
       <div className="hide-scroll" style={{display:"flex",gap:10,overflowX:"auto",padding:"0 16px"}}>
-        {items.filter(a=>a.image).slice(0,5).map(item=><div key={item.id} onClick={()=>{setExpanded(item.id);onPick(item.id);}} style={{flexShrink:0,cursor:"pointer"}}>
+        {items.filter(a=>a.image).slice(0,5).map(item=><div key={item.id} onClick={()=>setExpanded(item.id)} style={{flexShrink:0,cursor:"pointer"}}>
           <div style={{width:130,height:84,borderRadius:10,overflow:"hidden",position:"relative",background:"#111"}}>
             <ImgBg src={item.image}/><div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.22)"}}/>
             <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>
@@ -386,11 +449,10 @@ const SignalTab = ({onPick}) => {
 /* ─── Main App ─── */
 export default function App() {
   const [tab,setTab]=useState("Briefing");
-  const [activeTopic,setActiveTopic]=useState(null);
+  const [sheetId,setSheetId]=useState(null);
   const [data,setData]=useState({timeline:[],topics:[],articles:[]});
   const [loading,setLoading]=useState(true);
   const scrollRef=useRef(null);
-  const hasHL = activeTopic!=null;
 
   useEffect(()=>{
     fetch("/api/feed").then(r=>r.json()).then(d=>{
@@ -403,7 +465,7 @@ export default function App() {
 
   useEffect(()=>{if(scrollRef.current) scrollRef.current.scrollTop=0;},[tab]);
 
-  const changeTab = t => {if(t!=="middle") setActiveTopic(null); setTab(t);};
+  const openDeeper = useCallback(id=>setSheetId(id),[]);
 
   if(loading) return <div style={{height:"100vh",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>
     <span style={{color:"#999",fontSize:11,fontFamily:FONT}}>Loading NBC News…</span>
@@ -418,6 +480,7 @@ export default function App() {
       @keyframes pulse-badge{0%,100%{opacity:1}50%{opacity:.7}}
       @keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.5}}
       @keyframes fade-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes pill-glow{0%,100%{box-shadow:0 0 8px rgba(59,130,246,.15)}50%{box-shadow:0 0 18px rgba(59,130,246,.35)}}
       .tab-pane{animation:fade-in .18s ease both}
       .hide-scroll{scrollbar-width:none;-ms-overflow-style:none}
       .hide-scroll::-webkit-scrollbar{display:none}
@@ -442,18 +505,19 @@ export default function App() {
                 </div>
               </div>
               <div style={{padding:"4px 38px 0"}}>
-                <TabBar active={tab} onChange={changeTab} hasHL={hasHL}/>
+                <TabBar active={tab} onChange={setTab}/>
               </div>
             </div>
             {/* Scroll */}
             <div ref={scrollRef} className="phone-scroll" style={{position:"absolute",top:HEADER_H,left:0,right:0,bottom:NAV_H,overflowY:"auto",overflowX:"hidden"}}>
               <div key={tab} className="tab-pane">
-                {tab==="Briefing"&&<BriefingTab scrollEl={scrollRef} onSelect={setActiveTopic}/>}
-                {tab==="middle"&&hasHL&&<DeeperTab topicId={activeTopic} onClear={()=>setActiveTopic(null)}/>}
-                {tab==="middle"&&!hasHL&&<InsiderTab/>}
-                {tab==="Signal"&&<SignalTab onPick={id=>{setActiveTopic(id);}}/>}
+                {tab==="Briefing"&&<BriefingTab scrollEl={scrollRef} onDeeper={openDeeper}/>}
+                {tab==="middle"&&<InsiderTab/>}
+                {tab==="Signal"&&<SignalTab onDeeper={openDeeper}/>}
               </div>
             </div>
+            {/* Bottom sheet overlay (inside the phone) */}
+            {sheetId && <DeeperSheet articleId={sheetId} onClose={()=>setSheetId(null)}/>}
             {/* Bottom nav */}
             <div style={{position:"absolute",bottom:0,left:0,right:0,height:NAV_H,zIndex:20,background:C.bg,borderTop:"1px solid rgba(255,255,255,.1)",display:"flex",alignItems:"center",justifyContent:"space-around",padding:"0 4px"}}>
               {[
