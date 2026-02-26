@@ -349,7 +349,7 @@ const SignalTab = ({onPick}) => {
       <span style={{fontSize:9,fontWeight:700,color:C.gold,letterSpacing:".04em"}}>★ AD-FREE</span>
     </div>
     <div style={{padding:"12px 16px 0"}}>
-      {featured.map((item,i)=><div key={item.id} onClick={()=>setExpanded(item.id)} style={{marginBottom:10,borderRadius:14,overflow:"hidden",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
+      {featured.map((item,i)=><div key={item.id} onClick={()=>{setExpanded(item.id);onPick(item.id);}} style={{marginBottom:10,borderRadius:14,overflow:"hidden",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",cursor:"pointer"}}>
         <div style={{height:100,position:"relative",overflow:"hidden"}}>
           <ImgBg src={item.image}/>
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.75),rgba(0,0,0,.1) 60%,transparent)"}}/>
@@ -366,7 +366,7 @@ const SignalTab = ({onPick}) => {
     {sections.map(([cat,items])=><div key={cat} style={{marginBottom:24}}>
       <div style={{padding:"8px 16px",fontSize:14,fontWeight:700,color:C.white,letterSpacing:"-.02em"}}>{(CAT_STYLE[cat]||fallbackStyle).badge}</div>
       <div className="hide-scroll" style={{display:"flex",gap:10,overflowX:"auto",padding:"0 16px"}}>
-        {items.filter(a=>a.image).slice(0,5).map(item=><div key={item.id} onClick={()=>setExpanded(item.id)} style={{flexShrink:0,cursor:"pointer"}}>
+        {items.filter(a=>a.image).slice(0,5).map(item=><div key={item.id} onClick={()=>{setExpanded(item.id);onPick(item.id);}} style={{flexShrink:0,cursor:"pointer"}}>
           <div style={{width:130,height:84,borderRadius:10,overflow:"hidden",position:"relative",background:"#111"}}>
             <ImgBg src={item.image}/><div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.22)"}}/>
             <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>
@@ -451,7 +451,7 @@ export default function App() {
                 {tab==="Briefing"&&<BriefingTab scrollEl={scrollRef} onSelect={setActiveTopic}/>}
                 {tab==="middle"&&hasHL&&<DeeperTab topicId={activeTopic} onClear={()=>setActiveTopic(null)}/>}
                 {tab==="middle"&&!hasHL&&<InsiderTab/>}
-                {tab==="Signal"&&<SignalTab onPick={id=>{setActiveTopic(id);setTab("middle");}}/>}
+                {tab==="Signal"&&<SignalTab onPick={id=>{setActiveTopic(id);}}/>}
               </div>
             </div>
             {/* Bottom nav */}
