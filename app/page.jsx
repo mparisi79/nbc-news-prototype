@@ -525,4 +525,16 @@ export default function App() {
                 {label:"Home",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>},
                 {label:"Live",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>},
                 {label:"Subscribers",active:true,icon:<PeacockNav/>},
-                {label:"Shorts",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><polygo
+                {label:"Shorts",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><polygon points="10 10 10 18 16 14" fill="rgba(255,255,255,.45)" stroke="none"/></svg>},
+                {label:"Discover",icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},
+              ].map((item,i)=><div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",minWidth:48}}>
+                {item.icon}
+                <span style={{fontSize:9,fontWeight:item.active?700:500,color:item.active?C.blue:"rgba(255,255,255,.45)"}}>{item.label}</span>
+              </div>)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </DataCtx.Provider>;
+}
