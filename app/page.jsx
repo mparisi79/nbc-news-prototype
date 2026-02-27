@@ -122,7 +122,7 @@ const CompactCard = ({item, offset}) => {
   </div>;
 };
 
-/* ─── "Go deeper" pill ─── */
+/* ─── "Go deeper" pill (used in Signal expanded view) ─── */
 const DeeperPill = ({onClick}) => (
   <button onClick={onClick} style={{
     display:"flex",alignItems:"center",gap:6,
@@ -464,10 +464,19 @@ export default function App() {
   const scrollRef=useRef(null);
 
   useEffect(()=>{
-    fetch("/api/feed").then(r=>r.json()).then(d=>{
+    const checkImg = (url) => new Promise(resolve => {
+      if(!url) return resolve(false);
+      const img = new Image();
+      img.onload = ()=>resolve(true);
+      img.onerror = ()=>resolve(false);
+      img.src = url;
+    });
+    fetch("/api/feed").then(r=>r.json()).then(async d=>{
       const arts = d.articles||[];
-      const timeline = arts.filter(a=>a.image).slice(0,8);
-      setData({timeline,topics:timeline,articles:arts});
+      const checks = await Promise.all(arts.map(a=>checkImg(a.image)));
+      const verified = arts.filter((_,i)=>checks[i]);
+      const timeline = verified.slice(0,8);
+      setData({timeline,topics:timeline,articles:verified});
       setLoading(false);
     }).catch(()=>setLoading(false));
   },[]);
